@@ -2,55 +2,15 @@
 #![warn(clippy::pedantic)]
 
 pub mod path_part;
-pub mod problem;
 
 use is_executable::IsExecutable;
 use itertools::Itertools;
 use path_part::PathPart;
-use problem::Problem;
 use std::ffi::OsStr;
-use std::fmt::Display;
 use std::fs::DirEntry;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::{ffi::OsString, path::PathBuf};
-
-/// Use it to add diagnostic info to running a command:
-///
-/// ```rust,no_run
-/// use std::process::Command;
-/// use which_problem::WhichProblem;
-///
-/// let program = "sh";
-/// Command::new(program)
-///     .arg("-c")
-///     .arg("echo hello")
-///     .output()
-///     .map_err(|error| {
-///        eprintln!("Executing command failed: #{program}");
-///        eprintln!("Error: {error}");
-///        eprintln!("Diagnostic info:");
-///        eprintln!("{}", WhichProblem::new("cat").diagnose().unwrap_or_default());
-///        error
-///     })
-///     .unwrap();
-/// ```
-///
-/// Configure with custom options:
-///
-/// ```rust,no_run
-/// use std::ffi::OsString;
-/// use which_problem::WhichProblem;
-///
-/// WhichProblem {
-///   program: OsString::from("cat"),
-///   path_env: std::env::var_os("CUSTOM_VALUE"),
-///   ..WhichProblem::default()
-/// }.diagnose()
-///  .unwrap()
-///  .display();
-/// ```
-///
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WhichProblem {
@@ -94,40 +54,58 @@ struct ResolvedWhich {
     guess_limit: usize,
 }
 
-// Returns true if the symlink destination exists on disk
-fn symlink_file_exists(path: &Path) -> bool {
-    path.canonicalize() // Resolves symlink to path
-        .ok()
-        .map_or(false, |c| c.exists())
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum FileState {
+    Missing,
+    IsDir,
+    NotExecutable,
+    BadSymlink,
+    Valid,
 }
 
-fn bad_symlinks(program: &OsString, parts: &Vec<PathPart>) -> Option<Vec<PathBuf>> {
-    let found = parts
-        .iter()
-        .map(|p| p.absolute.join(&program))
-        .filter(|file| file.is_symlink())
-        .filter(|f| !symlink_file_exists(&f))
-        .collect::<Vec<PathBuf>>();
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum SymlinkState {
+    Missing,
+    NotExecutable,
+    IsDir,
+    Valid,
+}
 
-    if found.is_empty() {
-        None
+fn symlink_state(path: &Path) -> SymlinkState {
+    if let Some(link) = path
+        .canonicalize() // Resolves symlink to path
+        .ok()
+    {
+        match file_state(&link) {
+            FileState::Missing => SymlinkState::Missing,
+            FileState::IsDir => SymlinkState::IsDir,
+            FileState::NotExecutable => SymlinkState::NotExecutable,
+            FileState::BadSymlink => SymlinkState::Missing,
+            FileState::Valid => SymlinkState::Valid,
+        }
     } else {
-        Some(found)
+        SymlinkState::Missing
     }
 }
 
-fn find_files(program: &OsString, parts: &Vec<PathPart>) -> Option<Vec<PathBuf>> {
-    let found = parts
-        .iter()
-        .map(|p| p.absolute.join(&program))
-        .filter(|file| file.exists())
-        .filter(|file| !file.is_dir())
-        .collect::<Vec<PathBuf>>();
-
-    if found.is_empty() {
-        None
+fn file_state(path: &Path) -> FileState {
+    if path.is_symlink() {
+        match symlink_state(&path) {
+            SymlinkState::Valid => FileState::Valid,
+            _ => FileState::BadSymlink,
+        }
+    } else if path.exists() {
+        if path.is_dir() {
+            FileState::IsDir
+        } else {
+            if path.is_executable() {
+                FileState::Valid
+            } else {
+                FileState::NotExecutable
+            }
+        }
     } else {
-        Some(found)
+        FileState::Missing
     }
 }
 
@@ -170,93 +148,55 @@ fn suggest_spelling(
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct WhichFileFound {
+    pub bad_dirs: Vec<PathBuf>,
+    pub valid_files: Vec<PathBuf>,
+    pub bad_symlinks: Vec<PathBuf>,
+    pub bad_executables: Vec<PathBuf>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Program {
+    pub name: OsString,
+    pub is_empty: bool,
+    pub suggested: Option<Vec<OsString>>,
+    pub path_parts: Vec<PathPart>,
+    pub found_files: WhichFileFound,
+    pub contains_whitespace: bool,
+}
+
 impl ResolvedWhich {
-    fn check_program(&self, problems: &mut Vec<Problem>) {
-        if self.program.is_empty() {
-            problems.push(Problem::IsEmpty);
+    fn check(&self) -> Program {
+        let mut found_files = WhichFileFound::default();
+
+        for path in self
+            .path_parts
+            .iter()
+            .map(|p| p.absolute.join(&self.program))
+        {
+            match file_state(&path) {
+                FileState::Missing => {}
+                FileState::IsDir => found_files.bad_dirs.push(path.clone()),
+                FileState::Valid => found_files.valid_files.push(path.clone()),
+                FileState::BadSymlink => found_files.bad_symlinks.push(path.clone()),
+                FileState::NotExecutable => found_files.bad_executables.push(path.clone()),
+            }
         }
 
-        if (self.program)
+        let contains_whitespace = (self.program)
             .as_bytes()
             .iter()
-            .any(u8::is_ascii_whitespace)
-        {
-            problems.push(Problem::ContainsWhitespace(self.program.clone()));
+            .any(u8::is_ascii_whitespace);
+
+        Program {
+            name: self.program.clone(),
+            is_empty: self.program.is_empty(),
+            suggested: suggest_spelling(&self.program, &self.path_parts, self.guess_limit),
+            path_parts: self.path_parts.clone(),
+            found_files,
+            contains_whitespace,
         }
-
-        // ## Symlinks
-        if let Some(files) = bad_symlinks(&self.program, &self.path_parts) {
-            problems.push(Problem::FoundFilesBadSymlink(files));
-        }
-
-        // ## Found files
-        if let Some(files) = find_files(&self.program, &self.path_parts) {
-            let (valid, cannot_execute): (Vec<_>, Vec<_>) = files
-                .iter()
-                .map(std::clone::Clone::clone)
-                .partition(|f| f.is_executable());
-
-            if !cannot_execute.is_empty() {
-                problems.push(Problem::FoundFilesNotExecutable(cannot_execute));
-            }
-
-            if valid.len() > 1 {
-                problems.push(Problem::FoundMultipleExecutables(valid));
-            }
-        } else {
-            if let Some(guesses) =
-                suggest_spelling(&self.program, &self.path_parts, self.guess_limit)
-            {
-                problems.push(Problem::NotFoundSuggestedSpelling(guesses))
-            }
-        }
-    }
-
-    fn check_path(&self, problems: &mut Vec<Problem>) {
-        // PATH is empty and program is not a valid path
-        if self.path_parts.is_empty() && !Into::<PathBuf>::into(&self.program).exists() {
-            problems.push(Problem::PathIsTotallyEmpty);
-        }
-
-        // Parts exist, but are not directories
-        if let Some(parts) = parts_not_dir(&self.path_parts) {
-            problems.push(Problem::PathPiecesNotDir(parts));
-        };
-
-        // Parts do not exist on disk
-        if let Some(parts) = parts_do_not_exist(&self.path_parts) {
-            assert!(!parts.is_empty());
-            problems.push(Problem::PathPiecesDoNotExist(parts));
-        }
-    }
-}
-
-fn parts_do_not_exist(parts: &Vec<PathPart>) -> Option<Vec<PathPart>> {
-    let found = parts
-        .iter()
-        .filter(|p| !p.absolute.exists())
-        .map(|p| p.clone())
-        .collect::<Vec<PathPart>>();
-
-    if found.is_empty() {
-        None
-    } else {
-        Some(found)
-    }
-}
-
-fn parts_not_dir(parts: &Vec<PathPart>) -> Option<Vec<PathPart>> {
-    let found = parts
-        .iter()
-        .filter(|p| p.absolute.exists())
-        .filter(|p| !p.absolute.is_dir())
-        .map(|p| p.clone())
-        .collect::<Vec<PathPart>>();
-
-    if found.is_empty() {
-        None
-    } else {
-        Some(found)
     }
 }
 
@@ -286,90 +226,42 @@ impl WhichProblem {
     /// # Errors
     ///
     /// - If the current directory cannot be determined
-    pub fn diagnose(&self) -> Result<Problems, std::io::Error> {
+    pub fn diagnose(&self) -> Result<Program, std::io::Error> {
         let which = self.resolve()?;
-        let mut problems = Vec::new();
 
-        which.check_program(&mut problems);
-        which.check_path(&mut problems);
-
-        Ok(Problems { problems })
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct Problems {
-    pub problems: Vec<Problem>,
-}
-
-impl Problems {
-    pub fn iter(&self) -> <Problems as IntoIterator>::IntoIter {
-        self.clone().into_iter()
-    }
-
-    pub fn display(&self) -> String {
-        format!("{self}")
-    }
-}
-
-impl IntoIterator for Problems {
-    type Item = Problem;
-    type IntoIter = <Vec<Problem> as IntoIterator>::IntoIter; // so that you don't have to write std::vec::IntoIter, which nobody remembers anyway
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.problems.into_iter()
-    }
-}
-
-impl Display for Problems {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let data = self
-            .problems
-            .iter()
-            .map(|p| p.display())
-            .collect::<Vec<_>>()
-            .join("\n");
-        f.write_str(&data)?;
-        Ok(())
+        Ok(which.check())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use path_part::PathState;
     use std::os::unix::fs::PermissionsExt;
 
     #[test]
     fn empty_program_name() {
-        let problems = WhichProblem {
+        let program = WhichProblem {
             program: OsString::new(),
             ..WhichProblem::default()
         }
         .diagnose()
         .unwrap();
 
-        assert_eq!(
-            Some(Problem::IsEmpty),
-            problems.iter().find(move |p| p == &Problem::IsEmpty)
-        );
+        assert!(program.is_empty);
     }
 
     #[test]
     fn check_whitespace_program() {
         let program = OsString::from("lol ");
-        let problems = WhichProblem {
+        let program = WhichProblem {
             program: program.clone(),
             ..WhichProblem::default()
         }
         .diagnose()
         .unwrap();
 
-        assert_eq!(
-            Some(Problem::ContainsWhitespace(program.clone())),
-            problems
-                .iter()
-                .find(move |p| p == &Problem::ContainsWhitespace(program.clone()))
-        );
+        assert!(program.contains_whitespace)
     }
 
     fn make_executable(file: &Path) {
@@ -394,7 +286,7 @@ mod tests {
         make_executable(&file);
         make_executable(&file_two);
 
-        let problems = WhichProblem {
+        let program = WhichProblem {
             program: program,
             path_env: Some(vec![dir.as_os_str(), dir_two.as_os_str()].join(&OsString::from(":"))),
             ..WhichProblem::default()
@@ -402,16 +294,7 @@ mod tests {
         .diagnose()
         .unwrap();
 
-        assert_eq!(
-            Some(vec![
-                dir.join(file.file_name().unwrap()),
-                dir_two.join(file.file_name().unwrap())
-            ]),
-            problems.iter().find_map(|f| match f {
-                Problem::FoundMultipleExecutables(files) => Some(files),
-                _ => None,
-            })
-        );
+        assert_eq!(vec![file, file_two], program.found_files.valid_files);
     }
 
     #[test]
@@ -419,23 +302,19 @@ mod tests {
         let tmp_dir = tempfile::tempdir().unwrap();
         let dir = tmp_dir.path();
         let file = dir.join("lol");
-        let program = OsString::from(file.file_name().unwrap());
+        let name = OsString::from(file.file_name().unwrap());
 
         std::fs::write(&file, "contents").unwrap();
 
-        let problems = WhichProblem {
-            program: program.clone(),
+        let program = WhichProblem {
+            program: name.clone(),
             path_env: Some(dir.as_os_str().into()),
             ..WhichProblem::default()
         }
         .diagnose()
         .unwrap();
 
-        let expected = Problem::FoundFilesNotExecutable(vec![file.clone()]);
-        assert_eq!(
-            Some(expected.clone()),
-            problems.iter().find(move |p| p == &expected)
-        );
+        assert_eq!(vec![file.clone()], program.found_files.bad_executables);
 
         let perms = std::fs::metadata(&file).unwrap().permissions();
         let mode = perms.mode() | 0o111;
@@ -443,21 +322,16 @@ mod tests {
 
         assert!(file.is_executable());
 
-        let problems = WhichProblem {
-            program: program,
+        let program = WhichProblem {
+            program: name,
             path_env: Some(dir.as_os_str().into()),
             ..WhichProblem::default()
         }
         .diagnose()
         .unwrap();
 
-        assert_eq!(
-            None,
-            problems.iter().find(|f| match f {
-                Problem::FoundFilesNotExecutable(_) => true,
-                _ => false,
-            })
-        );
+        assert!(program.found_files.bad_executables.is_empty());
+        assert_eq!(vec![file.clone()], program.found_files.valid_files);
     }
 
     #[test]
@@ -465,51 +339,48 @@ mod tests {
         let tmp_dir = tempfile::tempdir().unwrap();
         let dir = tmp_dir.path();
         let file = dir.join("lol");
-        let program = OsString::from(file.file_name().unwrap());
+        let name = OsString::from(file.file_name().unwrap());
 
         std::os::unix::fs::symlink(dir.join("nope"), &file).unwrap();
 
-        let problems = WhichProblem {
-            program: program,
+        assert_eq!(FileState::BadSymlink, file_state(&file));
+
+        let program = WhichProblem {
+            program: name,
             path_env: Some(dir.as_os_str().into()),
             ..WhichProblem::default()
         }
         .diagnose()
         .unwrap();
 
-        assert_eq!(
-            Some(vec![file]),
-            problems.iter().find_map(|f| match f {
-                Problem::FoundFilesBadSymlink(files) => Some(files),
-                _ => None,
-            })
-        );
+        assert_eq!(vec![file.clone()], program.found_files.bad_symlinks);
     }
+
     #[test]
     fn check_parts_are_dirs() {
         let tmp_dir = tempfile::tempdir().unwrap();
         let dir = tmp_dir.path();
         let file = dir.join("lol");
-        let program = OsString::from(file.file_name().unwrap());
+        let name = OsString::from(file.file_name().unwrap());
         let expected = dir.join("nope");
 
         std::fs::write(&expected, "lol").unwrap();
-        let problems = WhichProblem {
-            program: program,
+        let program = WhichProblem {
+            program: name,
             path_env: Some(vec![expected.as_os_str(), dir.as_os_str()].join(&OsString::from(":"))),
             ..WhichProblem::default()
         }
         .diagnose()
         .unwrap();
 
-        assert_eq!(
-            Some(vec![expected]),
-            problems.iter().find_map(|f| match f {
-                Problem::PathPiecesNotDir(files) =>
-                    Some(files.iter().map(|p| p.absolute.clone()).collect()),
-                _ => None,
-            })
-        );
+        assert!(!program
+            .path_parts
+            .iter()
+            .any(|p| p.state == PathState::Missing));
+        assert!(program
+            .path_parts
+            .iter()
+            .any(|p| p.state == PathState::NotDir));
     }
 
     #[test]
@@ -517,25 +388,25 @@ mod tests {
         let tmp_dir = tempfile::tempdir().unwrap();
         let dir = tmp_dir.path();
         let file = dir.join("lol");
-        let program = OsString::from(file.file_name().unwrap());
+        let name = OsString::from(file.file_name().unwrap());
         let expected = dir.join("nope");
 
-        let problems = WhichProblem {
-            program: program,
+        let program = WhichProblem {
+            program: name,
             path_env: Some(vec![expected.as_os_str(), dir.as_os_str()].join(&OsString::from(":"))),
             ..WhichProblem::default()
         }
         .diagnose()
         .unwrap();
 
-        assert_eq!(
-            Some(vec![expected]),
-            problems.iter().find_map(|f| match f {
-                Problem::PathPiecesDoNotExist(files) =>
-                    Some(files.iter().map(|p| p.absolute.clone()).collect()),
-                _ => None,
-            })
-        );
+        assert!(program
+            .path_parts
+            .iter()
+            .any(|p| p.state == PathState::Missing));
+        assert!(!program
+            .path_parts
+            .iter()
+            .any(|p| p.state == PathState::NotDir));
     }
 
     #[test]
@@ -543,14 +414,14 @@ mod tests {
         let tmp_dir = tempfile::tempdir().unwrap();
         let dir = tmp_dir.path();
         let file = dir.join("lol");
-        let program = OsString::from(file.file_name().unwrap());
+        let name = OsString::from(file.file_name().unwrap());
 
         let actual = dir.join("rofl");
         std::fs::write(&actual, "contents").unwrap();
         make_executable(&actual);
 
-        let problems = WhichProblem {
-            program: program,
+        let program = WhichProblem {
+            program: name,
             path_env: Some(dir.as_os_str().into()),
             ..WhichProblem::default()
         }
@@ -558,11 +429,10 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            Some(vec![actual.file_name().unwrap().to_os_string()]),
-            problems.iter().find_map(|f| match f {
-                Problem::NotFoundSuggestedSpelling(files) => Some(files),
-                _ => None,
-            })
+            program.suggested.unwrap(),
+            vec![actual.file_name().unwrap()]
         );
+
+        assert_eq!(program.name, file.file_name().unwrap());
     }
 }
