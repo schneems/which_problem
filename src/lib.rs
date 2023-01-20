@@ -72,15 +72,13 @@ enum SymlinkState {
 }
 
 fn symlink_state(path: &Path) -> SymlinkState {
-    if let Some(link) = path
-        .canonicalize() // Resolves symlink to path
-        .ok()
+    if let Ok(link) = path.canonicalize()
+    // Resolves symlink to path
     {
         match file_state(&link) {
-            FileState::Missing => SymlinkState::Missing,
+            FileState::Missing | FileState::BadSymlink => SymlinkState::Missing,
             FileState::IsDir => SymlinkState::IsDir,
             FileState::NotExecutable => SymlinkState::NotExecutable,
-            FileState::BadSymlink => SymlinkState::Missing,
             FileState::Valid => SymlinkState::Valid,
         }
     } else {
@@ -90,19 +88,17 @@ fn symlink_state(path: &Path) -> SymlinkState {
 
 fn file_state(path: &Path) -> FileState {
     if path.is_symlink() {
-        match symlink_state(&path) {
+        match symlink_state(path) {
             SymlinkState::Valid => FileState::Valid,
             _ => FileState::BadSymlink,
         }
     } else if path.exists() {
         if path.is_dir() {
             FileState::IsDir
+        } else if path.is_executable() {
+            FileState::Valid
         } else {
-            if path.is_executable() {
-                FileState::Valid
-            } else {
-                FileState::NotExecutable
-            }
+            FileState::NotExecutable
         }
     } else {
         FileState::Missing
@@ -111,16 +107,19 @@ fn file_state(path: &Path) -> FileState {
 
 fn suggest_spelling(
     program: &OsString,
-    parts: &Vec<PathPart>,
+    parts: &[PathPart],
     guess_limit: usize,
 ) -> Option<Vec<OsString>> {
     let mut heap = std::collections::BinaryHeap::new();
     let values = parts
         .iter()
         .filter_map(|p| std::fs::read_dir(&p.absolute).ok())
-        .flat_map(|r| r.filter_map(|f| f.ok()).collect::<Vec<DirEntry>>())
+        .flat_map(|r| {
+            r.filter_map(std::result::Result::ok)
+                .collect::<Vec<DirEntry>>()
+        })
         .map(|d| d.path())
-        .filter_map(|p| p.file_name().and_then(|f| Some(f.to_os_string())))
+        .filter_map(|p| p.file_name().map(std::ffi::OsStr::to_os_string))
         .unique()
         .map(|filename| {
             let score = strsim::normalized_levenshtein(
@@ -156,19 +155,12 @@ pub struct WhichFileFound {
     pub bad_executables: Vec<PathBuf>,
 }
 
-#[derive(Clone, Debug)]
-pub struct Program {
-    pub name: OsString,
-    pub is_empty: bool,
-    pub suggested: Option<Vec<OsString>>,
-    pub path_parts: Vec<PathPart>,
-    pub found_files: WhichFileFound,
-    pub contains_whitespace: bool,
-}
-
 impl ResolvedWhich {
     fn check(&self) -> Program {
-        let mut found_files = WhichFileFound::default();
+        let mut bad_dirs = Vec::new();
+        let mut valid_files = Vec::new();
+        let mut bad_symlinks = Vec::new();
+        let mut bad_executables = Vec::new();
 
         for path in self
             .path_parts
@@ -177,10 +169,10 @@ impl ResolvedWhich {
         {
             match file_state(&path) {
                 FileState::Missing => {}
-                FileState::IsDir => found_files.bad_dirs.push(path.clone()),
-                FileState::Valid => found_files.valid_files.push(path.clone()),
-                FileState::BadSymlink => found_files.bad_symlinks.push(path.clone()),
-                FileState::NotExecutable => found_files.bad_executables.push(path.clone()),
+                FileState::IsDir => bad_dirs.push(path.clone()),
+                FileState::Valid => valid_files.push(path.clone()),
+                FileState::BadSymlink => bad_symlinks.push(path.clone()),
+                FileState::NotExecutable => bad_executables.push(path.clone()),
             }
         }
 
@@ -194,7 +186,10 @@ impl ResolvedWhich {
             is_empty: self.program.is_empty(),
             suggested: suggest_spelling(&self.program, &self.path_parts, self.guess_limit),
             path_parts: self.path_parts.clone(),
-            found_files,
+            bad_dirs,
+            valid_files,
+            bad_symlinks,
+            bad_executables,
             contains_whitespace,
         }
     }
@@ -233,6 +228,150 @@ impl WhichProblem {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Program {
+    name: OsString,
+    is_empty: bool,
+    suggested: Option<Vec<OsString>>,
+    path_parts: Vec<PathPart>,
+    bad_dirs: Vec<PathBuf>,
+    valid_files: Vec<PathBuf>,
+    bad_symlinks: Vec<PathBuf>,
+    bad_executables: Vec<PathBuf>,
+    contains_whitespace: bool,
+}
+
+impl Program {
+    pub fn name(&self) -> &OsString {
+        &self.name
+    }
+
+    pub fn is_found(&self) -> bool {
+        !self.valid_files.is_empty()
+    }
+
+    pub fn bad_dirs(&self) -> &Vec<PathBuf> {
+        &self.bad_dirs
+    }
+
+    pub fn valid_files(&self) -> &Vec<PathBuf> {
+        &self.valid_files
+    }
+
+    pub fn bad_symlinks(&self) -> &Vec<PathBuf> {
+        &self.bad_symlinks
+    }
+
+    pub fn bad_executables(&self) -> &Vec<PathBuf> {
+        &self.bad_executables
+    }
+
+    pub fn name_is_empty(&self) -> bool {
+        self.is_empty
+    }
+
+    pub fn suggested(&self) -> &Option<Vec<OsString>> {
+        &self.suggested
+    }
+
+    pub fn path_parts(&self) -> &Vec<PathPart> {
+        &self.path_parts
+    }
+
+    pub fn contains_whitespace(&self) -> bool {
+        self.contains_whitespace
+    }
+
+    pub fn report(&self) -> String {
+        let mut out = String::new();
+        if let Some(found) = self.valid_files().first() {
+            out.push_str(&format!(
+                r#"Info: 'which "{:?}"' found '{}'.\n"#,
+                self.name(),
+                found.display(),
+            ));
+
+            if self.valid_files().len() > 1 {
+                out.push_str("\n");
+                out.push_str(&format!("Warning: Multiple executables found.\n",));
+                for path in self.valid_files() {
+                    out.push_str(&format!("  - {}\n", path.display()))
+                }
+
+                out.push_str("\n");
+                out.push_str(&format!(
+                    "Help: Ensure the executable you expected comes first.\n",
+                ));
+            }
+        } else {
+            out.push_str(&format!(
+                r#"Info: 'which "{:?}"' not found.\n"#,
+                self.name(),
+            ));
+            if self.name_is_empty() {
+                out.push_str("Warning: program is blank.\n");
+            }
+            if self.contains_whitespace() {
+                out.push_str("Warning: program contains whitespace.\n");
+            }
+        }
+
+        if !self.bad_dirs().is_empty() {
+            out.push_str("Warning: matched paths are directories (expected to be files).");
+            for path in self.bad_dirs() {
+                out.push_str(&format!("  - {}", path.display()));
+            }
+        }
+
+        if !self.bad_symlinks().is_empty() {
+            out.push_str("Warning: matched paths are invalid symlinks.");
+            for path in self.bad_symlinks() {
+                out.push_str(&format!("  - {}", path.display()));
+            }
+        }
+
+        if !self.bad_executables().is_empty() {
+            out.push_str("Warning: matched paths do not have executable permissions.");
+            for path in self.bad_executables() {
+                out.push_str(&format!("  - {}", path.display()));
+            }
+        }
+
+        out.push_str("\n");
+        out.push_str("Info: Looked in PATHs:\n");
+        for part in self.path_parts() {
+            out.push_str(&format!("  - [{}] {}", part.state, part.original.display()));
+            if part.is_relative() {
+                out.push_str(&format!("(relative from {})", part.cwd.display()));
+            }
+            out.push_str("\n");
+        }
+        out
+    }
+}
+
+// impl std::fmt::Display for Program {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         f.write_fmt(format_args!(
+//             "System diagnostic information for failed command '{:?}'\n\n",
+//             self.name()
+//         ))?;
+
+//         Ok(())
+//     }
+// }
+
+// fn lol() {
+//     WhichProblem {
+//         program: OsString::from("lol"),
+//         ..WhichProblem::default()
+//     }
+//     .diagnose()
+//     .map(|diagnose| eprintln!("{diagnose.report()}"))
+//     .map_err(|e| eprintln!("Current dir does not exist or not enough permissions {e}"))
+//     .ok();
+// }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248,20 +387,20 @@ mod tests {
         .diagnose()
         .unwrap();
 
-        assert!(program.is_empty);
+        assert!(program.name_is_empty());
     }
 
     #[test]
     fn check_whitespace_program() {
         let program = OsString::from("lol ");
         let program = WhichProblem {
-            program: program.clone(),
+            program,
             ..WhichProblem::default()
         }
         .diagnose()
         .unwrap();
 
-        assert!(program.contains_whitespace)
+        assert!(program.contains_whitespace())
     }
 
     fn make_executable(file: &Path) {
@@ -287,14 +426,14 @@ mod tests {
         make_executable(&file_two);
 
         let program = WhichProblem {
-            program: program,
+            program,
             path_env: Some(vec![dir.as_os_str(), dir_two.as_os_str()].join(&OsString::from(":"))),
             ..WhichProblem::default()
         }
         .diagnose()
         .unwrap();
 
-        assert_eq!(vec![file, file_two], program.found_files.valid_files);
+        assert_eq!(&vec![file, file_two], program.valid_files());
     }
 
     #[test]
@@ -314,7 +453,7 @@ mod tests {
         .diagnose()
         .unwrap();
 
-        assert_eq!(vec![file.clone()], program.found_files.bad_executables);
+        assert_eq!(&vec![file.clone()], program.bad_executables());
 
         let perms = std::fs::metadata(&file).unwrap().permissions();
         let mode = perms.mode() | 0o111;
@@ -330,8 +469,8 @@ mod tests {
         .diagnose()
         .unwrap();
 
-        assert!(program.found_files.bad_executables.is_empty());
-        assert_eq!(vec![file.clone()], program.found_files.valid_files);
+        assert!(program.bad_executables().is_empty());
+        assert_eq!(&vec![file], program.valid_files());
     }
 
     #[test]
@@ -353,7 +492,7 @@ mod tests {
         .diagnose()
         .unwrap();
 
-        assert_eq!(vec![file.clone()], program.found_files.bad_symlinks);
+        assert_eq!(&vec![file], program.bad_symlinks());
     }
 
     #[test]
@@ -429,10 +568,10 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            program.suggested.unwrap(),
+            program.suggested.clone().unwrap(),
             vec![actual.file_name().unwrap()]
         );
 
-        assert_eq!(program.name, file.file_name().unwrap());
+        assert_eq!(program.name(), file.file_name().unwrap());
     }
 }
