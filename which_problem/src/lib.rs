@@ -1,5 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![doc = include_str!("../../README.md")]
 #![warn(unused_crate_dependencies)]
 #![warn(clippy::pedantic)]
 

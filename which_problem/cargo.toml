@@ -1,10 +1,14 @@
 [package]
 name = "which_problem"
 version = "0.1.0"
-edition = "2021"
-readme = "README.md"
-include = ["src/**/*", "LICENSE", "README.md"]
-
+edition.workspace = true
+readme.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "Diganose your executable lookup problems with this rust library"
+documentation = "https://docs.rs/which_problem"
+keywords = ["executable", "which", "lookup"]
 
 [dependencies]
 is_executable = "1.0.1"
