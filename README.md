@@ -21,7 +21,7 @@ Warning: Executables with the same name found on the PATH:
   - [OK] "/usr/local/bin/bundle"
   - [OK] "/usr/local/bin/bundle"
   - [OK] "/usr/bin/bundle"
-Help: Ensure the one you want comes first and is [OK]'
+Help: Ensure the one you want comes first and is [OK]
 Explanation:
     [OK] - File found matching program name with executable permissions. Valid executable.
 
