@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+#![doc = include_str!("../../README.md")]
 #![warn(unused_crate_dependencies)]
 #![warn(clippy::pedantic)]
 
@@ -5,7 +7,7 @@
 ///
 /// Example:
 ///
-/// ```rust
+/// ```rust,no_run
 /// use std::process::Command;
 /// use which_problem::Which;
 ///
@@ -14,10 +16,13 @@
 ///     .arg("install")
 ///     .output()
 ///     .map_err(|error| {
-///        eprintln!("Executing command failed: #{program}");
-///        eprintln!("Error: {error}");
-///        eprintln!("Diagnostic info: {}", Which::new(program).diagnose().unwrap_or_default());
-///        error
+///         eprintln!("Executing command '{program}' failed. Error: {error}");
+///
+///         match Which::new(program).diagnose() {
+///             Ok(details) => println!("Diagnostic info: {details}"),
+///             Err(error) => println!("Warning: Internal which_problem error: {error}"),
+///         }
+///         error
 ///     })
 ///     .unwrap();
 /// ```

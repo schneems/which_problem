@@ -22,7 +22,7 @@ Warning: Executables with the same name found on the PATH:
   - [OK] "/usr/local/bin/bundle"
   - [OK] "/usr/bin/bundle"
 Help: Ensure the one you want comes first and is [OK]'
-Explanation:
+Explanation of keys:
     [OK] - File found matching program name with executable permissions. Valid executable.
 
 Info: These executables have the closest spelling to "bundle" but did not match:
@@ -42,7 +42,7 @@ Info: The following directories on PATH were searched (top to bottom):
   - [OK     ] "/usr/sbin"
   - [OK     ] "/sbin"
   - [OK     ] "/Users/rschneeman/.cargo/bin"
-Explanation:
+Explanation of keys:
     [OK     ] - Path part is a valid, non-empty, directory
     [MISSING] - Path part does not exist exist on disk, no such directory
 ```

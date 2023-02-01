@@ -18,6 +18,7 @@ pub struct Which {
     pub path_env: Option<OsString>,
 
     /// How many guesses to suggest if the command could not be found
+    /// set to 0 to disable.
     pub guess_limit: usize,
 }
 
@@ -28,6 +29,37 @@ impl Which {
             program,
             ..Self::default()
         }
+    }
+
+    fn resolve(&self) -> Result<ResolvedWhich, std::io::Error> {
+        let program = self.program.clone();
+        let path_env = self.path_env.clone().unwrap_or_else(|| OsString::from(""));
+
+        let cwd = match self.cwd.clone() {
+            Some(path) => path,
+            None => std::env::current_dir()?,
+        };
+
+        let path_parts = std::env::split_paths(&path_env.as_os_str())
+            .map(|part| PathPart::new(&cwd, &part))
+            .collect::<Vec<_>>();
+
+        let guess_limit = self.guess_limit;
+
+        Ok(ResolvedWhich {
+            program,
+            path_parts,
+            guess_limit,
+        })
+    }
+
+    /// # Errors
+    ///
+    /// - If the current directory cannot be determined
+    pub fn diagnose(&self) -> Result<Program, std::io::Error> {
+        let which = self.resolve()?;
+
+        Ok(which.check())
     }
 }
 
@@ -66,37 +98,4 @@ fn files_on_path(name: &OsString, path_parts: &[PathPart]) -> Vec<PathWithState>
         .map(PathWithState::new)
         .filter(|p| !matches!(p.state, FileState::Missing))
         .collect()
-}
-
-impl Which {
-    fn resolve(&self) -> Result<ResolvedWhich, std::io::Error> {
-        let program = self.program.clone();
-        let path_env = self.path_env.clone().unwrap_or_else(|| OsString::from(""));
-
-        let cwd = match self.cwd.clone() {
-            Some(path) => path,
-            None => std::env::current_dir()?,
-        };
-
-        let path_parts = std::env::split_paths(&path_env.as_os_str())
-            .map(|part| PathPart::new(&cwd, &part))
-            .collect::<Vec<_>>();
-
-        let guess_limit = self.guess_limit;
-
-        Ok(ResolvedWhich {
-            program,
-            path_parts,
-            guess_limit,
-        })
-    }
-
-    /// # Errors
-    ///
-    /// - If the current directory cannot be determined
-    pub fn diagnose(&self) -> Result<Program, std::io::Error> {
-        let which = self.resolve()?;
-
-        Ok(which.check())
-    }
 }

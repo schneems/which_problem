@@ -1,0 +1,17 @@
+[package]
+name = "which_problem"
+version = "0.1.0"
+edition = "2021"
+readme = "README.md"
+include = ["src/**/*", "LICENSE", "README.md"]
+
+
+[dependencies]
+is_executable = "1.0.1"
+itertools = "0.10.5"
+ordered-float = "3.4.0"
+rayon = "1.6.1"
+strsim = "0.10.0"
+
+[dev-dependencies]
+tempfile = "3.3.0"

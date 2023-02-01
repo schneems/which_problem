@@ -33,11 +33,17 @@ pub(crate) enum FileState {
 impl FileState {
     pub(crate) fn details(&self) -> String {
         match self {
-            FileState::Valid => "File is valid and found on the PATH",
-            FileState::IsDir => "Directory found, expecting a file",
-            FileState::Missing => "No such file at this path",
-            FileState::BadSymlink => "File containing a broken symlink found",
-            FileState::NotExecutable => "File found but it does not have executable permissions",
+            FileState::Valid => {
+                "File found matching program name with executable permissions. Valid executable."
+            }
+            FileState::IsDir => {
+                "Entry found matching program name, but is a directory. Executables must be a file"
+            }
+            FileState::Missing => "File not found at this path",
+            FileState::BadSymlink => "File found matching program name, but is a broken symlink",
+            FileState::NotExecutable => {
+                "File found matching program name, but it does not have executable permissions"
+            }
         }
         .to_string()
     }

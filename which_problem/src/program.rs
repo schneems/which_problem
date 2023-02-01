@@ -20,6 +20,7 @@ pub(crate) fn contains_whitespace(name: &OsString) -> bool {
 }
 
 impl Display for Program {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Program {
             name,
@@ -45,14 +46,12 @@ impl Display for Program {
             .max()
             .unwrap_or(0);
 
-        let name = format!("{name:?}");
-
         // Found/Not-found
         if let Some(found) = executable {
-            let file = found.path.display();
-            writeln!(f, r#"Program '{name}' found '{file}'"#)?;
+            let file = &found.path;
+            writeln!(f, r#"Program {name:?} found at {file:?}"#)?;
         } else {
-            writeln!(f, r#"Program '{name}' not found"#)?;
+            writeln!(f, r#"Program {name:?} not found"#)?;
 
             if self.name.is_empty() {
                 writeln!(f, "Warning: Program is blank")?;
@@ -67,18 +66,32 @@ impl Display for Program {
         if found_files.len() > 1 {
             f.write_str("Warning: Executables with the same name found on the PATH:\n")?;
             for path in found_files {
-                writeln!(f, "  - {path:file_state_width$}")?;
+                write!(f, "  ")?;
+                if executable
+                    .map(|found| &found.path)
+                    .and_then(|p| (p == &path.path).then_some(()))
+                    .is_some()
+                {
+                    write!(f, "> ")?;
+                } else {
+                    write!(f, "- ")?;
+                }
+
+                writeln!(f, "{path:file_state_width$}")?;
             }
-            f.write_char('\n')?;
             writeln!(
                 f,
                 "Help: Ensure the one you want comes first and is [{valid:file_state_width$}]'",
                 valid = FileState::Valid
             )?;
-            f.write_str("Explanation of keys:\n")?;
+            f.write_str("Explanation:\n")?;
             for state in found_files.iter().map(|p| p.state.clone()).unique() {
                 let details = state.details();
-                writeln!(f, "  [{state:file_state_width$}] - {details}'\n")?;
+                writeln!(
+                    f,
+                    "    [{:file_state_width$}] - {details}",
+                    &format!("{state}")
+                )?;
             }
             f.write_char('\n')?;
         } else {
@@ -88,17 +101,20 @@ impl Display for Program {
         // Suggestions
         writeln!(
             f,
-            "Info: These executables have the closest spelling to {name} but did not match:"
+            "Info: These executables have the closest spelling to {name:?} but did not match:"
         )?;
         f.write_str("      ")?;
-        let mut suggested = suggested.iter().peekable();
-        while let Some(guess) = suggested.next() {
-            write!(f, "'{guess:?}'")?;
-            if suggested.peek().is_some() {
-                f.write_str(", ")?;
-            }
+
+        if let Some(suggested) = suggested {
+            let out = suggested
+                .iter()
+                .map(|s| format!("{s:?}"))
+                .collect::<Vec<String>>()
+                .join(", ");
+
+            writeln!(f, "{out}")?;
+            f.write_char('\n')?;
         }
-        f.write_char('\n')?;
 
         // PATH parts
         if path_parts.is_empty() {
@@ -108,12 +124,24 @@ impl Display for Program {
                 "Info: The following directories on PATH were searched (top to bottom):\n",
             )?;
             for part in path_parts {
-                writeln!(f, "  - {part:part_width$}")?;
+                write!(f, "  ")?;
+                if executable
+                    .map(|found| &found.path)
+                    .and_then(|p| p.parent())
+                    .and_then(|parent| (parent == part.absolute).then_some(()))
+                    .is_some()
+                {
+                    write!(f, "> ")?;
+                } else {
+                    write!(f, "- ")?;
+                }
+
+                writeln!(f, "{part:part_width$}")?;
             }
-            f.write_str("Explanation of keys:\n")?;
+            f.write_str("Explanation:\n")?;
             for state in path_parts.iter().map(|p| p.state.clone()).unique() {
                 let details = state.details();
-                writeln!(f, "  [{state:part_width$}] - {details}'")?;
+                writeln!(f, "    [{:part_width$}] - {details}", &format!("{state}"))?;
             }
         }
 

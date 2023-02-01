@@ -18,11 +18,11 @@ impl PathWithState {
 impl Display for PathWithState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.state;
-        let path = self.path.display();
+        let path = &self.path;
         if let Some(width) = f.width() {
-            write!(f, "[{:width$}] {path}", &format!("{}", self.state))?;
+            write!(f, "[{:width$}] {path:?}", &format!("{}", self.state))?;
         } else {
-            write!(f, "[{state}] {path}")?;
+            write!(f, "[{state}] {path:?}")?;
         }
 
         Ok(())
@@ -40,6 +40,6 @@ mod tests {
             state: FileState::Valid,
         };
 
-        assert_eq!("[OK        ] /lol", &format!("{p:width$}", width = 10));
+        assert_eq!(r#"[OK        ] "/lol""#, &format!("{p:width$}", width = 10));
     }
 }

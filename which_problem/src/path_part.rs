@@ -33,10 +33,10 @@ impl PartState {
     #[must_use]
     pub(crate) fn details(&self) -> String {
         match self {
-            PartState::Valid => "Valid path directory that is not empty",
-            PartState::NotDir => "Exists, but is a file. Must be a directory",
-            PartState::Missing => "Does not exist",
-            PartState::EmptyDir => "Exists and is a directory, but is empty",
+            PartState::Valid => "Path part is a valid, non-empty, directory",
+            PartState::NotDir => "Path part exists, but is a file. Must be a directory",
+            PartState::Missing => "Path part does not exist exist on disk, no such directory",
+            PartState::EmptyDir => "Path part directory exists, but it is empty",
         }
         .to_string()
     }
@@ -45,17 +45,18 @@ impl PartState {
 impl Display for PathPart {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.state;
-        let path = self.original.display();
-        let cwd = self.cwd.display();
+        let path = &self.original;
+        let cwd = &self.cwd;
         if let Some(width) = f.width() {
-            write!(f, "[{:width$}] {path}", &format!("{}", self.state))?;
+            write!(f, "[{:width$}] ", &format!("{}", self.state))?;
         } else {
-            write!(f, "[{state}] {path}")?;
+            write!(f, "[{state}] ")?;
         }
 
         if self.relative {
-            write!(f, "(relative from {cwd})")?;
+            write!(f, "(relative from {cwd:?}) ")?;
         }
+        write!(f, "{path:?}")?;
 
         Ok(())
     }

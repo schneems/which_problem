@@ -1,14 +1,15 @@
-[package]
-name = "which_problem"
+[workspace]
+members = [
+    "which_problem",
+    "cargo-whichp"
+]
+
+[workspace.package]
 version = "0.1.0"
+rust-version = "1.64"
 edition = "2021"
+license = "MIT"
 
-[dependencies]
-is_executable = "1.0.1"
-itertools = "0.10.5"
-ordered-float = "3.4.0"
-rayon = "1.6.1"
-strsim = "0.10.0"
-
-[dev-dependencies]
-tempfile = "3.3.0"
+[workspace.dependencies]
+which_problem  = {version = "0.1.0", path = "which_problem" }
+cargo-whichp = {version = "0.1.0", path = "cargo-whichp" }

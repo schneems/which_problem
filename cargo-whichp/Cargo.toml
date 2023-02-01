@@ -1,0 +1,23 @@
+[package]
+name = "cargo-whichp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Cli for debugging executable lookup"
+keywords = ["executable", "which", "PATH"]
+
+[[bin]]
+name = "cargo-whichp"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.1.4", default-features = false, features = [
+  "derive",
+  "error-context",
+  "help",
+  "std",
+  "usage",
+] }
+
+which_problem.workspace = true

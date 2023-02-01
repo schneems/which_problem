@@ -10,6 +10,10 @@ pub(crate) fn spelling(
     parts: &[PathPart],
     guess_limit: usize,
 ) -> Option<Vec<OsString>> {
+    if guess_limit == 0 {
+        return None;
+    }
+
     let mut heap = std::collections::BinaryHeap::new();
     let values = parts
         .par_iter()
@@ -42,7 +46,9 @@ pub(crate) fn spelling(
             if out.len() >= guess_limit {
                 break;
             }
-            out.insert(filename.clone());
+            if filename != program {
+                out.insert(filename.clone());
+            }
         }
         if out.is_empty() {
             None
