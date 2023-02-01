@@ -7,6 +7,12 @@ use std::fmt::Display;
 use std::fmt::Write;
 use std::os::unix::ffi::OsStrExt;
 
+/// Holds the results of a `Which::diagnose` call
+///
+/// The main interface is intended to output diagnostic
+/// information to an end user.
+///
+/// See the `Display` implementation.
 #[derive(Clone, Debug, Default)]
 pub struct Program {
     pub(crate) name: OsString,

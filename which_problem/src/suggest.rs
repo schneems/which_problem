@@ -5,6 +5,15 @@ use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs::DirEntry;
 
+/// Find the closest match(es) to the given program name as suggestsions
+///
+/// Reads in all executables on the PATH and runs a string distance
+/// calculation between them and the `program`.
+///
+/// The top `guess_limit` results will be returned.
+///
+/// If no results are found, or `guess_limit` is zero then
+/// None will be returned.
 pub(crate) fn spelling(
     program: &OsString,
     parts: &[PathPart],

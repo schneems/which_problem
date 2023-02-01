@@ -2,6 +2,7 @@ use is_executable::IsExecutable;
 use std::fmt::Display;
 use std::path::Path;
 
+/// Return the state of a file inside of a PATH directory
 pub(crate) fn file_state(path: &Path) -> FileState {
     if path.is_symlink() {
         match symlink_state(path) {
@@ -21,6 +22,8 @@ pub(crate) fn file_state(path: &Path) -> FileState {
     }
 }
 
+/// All the various states a file inside of a PATH directory
+/// can hold.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) enum FileState {
     Valid,

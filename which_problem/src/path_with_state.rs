@@ -2,6 +2,7 @@ use crate::file_state::{file_state, FileState};
 use core::fmt::Display;
 use std::path::PathBuf;
 
+/// Represents a file on disk inside of a PATH directory
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PathWithState {
     pub(crate) path: PathBuf,

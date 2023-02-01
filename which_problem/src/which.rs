@@ -6,15 +6,42 @@ use crate::suggest;
 use std::ffi::OsStr;
 use std::{ffi::OsString, path::PathBuf};
 
+/// Find problems with executable lookup
+///
+/// Example:
+///
+/// ```rust,no_run
+/// use which_problem::Which;
+///
+/// let problems = Which::new("bundle").diagnose().unwrap();
+/// eprintln!("{problems}");
+/// ```
+///
+/// Selectively configure fields using `Which::default()`:
+///
+/// ```rust
+/// use std::ffi::OsString;
+/// use which_problem::Which;
+///
+/// let which = Which {
+///     program: OsString::from("bundle"),
+///     guess_limit: 5,
+///     path_env: Some(OsString::from("alternate:path:here")),
+///     ..Which::default()
+/// };
+/// eprintln!("{}", which.diagnose().unwrap());
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Which {
     /// The current working directory, affects PATHs with relative parts
     pub cwd: Option<PathBuf>,
 
-    /// The program name you're trying to execute i.e. for `which cat` it would be "cat"
+    /// The program name you're trying to execute i.e.
+    /// for `bundle install` would be "bundle".
     pub program: OsString,
 
     /// The contents of PATH environment variable
+    /// i.e. OsString::new("different:path:here")
     pub path_env: Option<OsString>,
 
     /// How many guesses to suggest if the command could not be found
