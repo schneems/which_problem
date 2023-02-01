@@ -12,26 +12,58 @@ use std::{
 /// It provides a normalized interface through the `absolute` property that
 /// should account for relative PATH pieces.
 ///
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub struct PathPart {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct PathPart {
     /// Expanded and resolved absolute path
-    pub absolute: PathBuf,
+    pub(crate) absolute: PathBuf,
 
     /// Current working directory when PATH was accessed
-    pub cwd: PathBuf,
+    pub(crate) cwd: PathBuf,
 
     // The status of the current path part i.e. if it's an empty dir or not etc.
-    pub state: PathState,
+    pub(crate) state: PartState,
 
     /// Original part of the PATH
-    pub original: PathBuf,
+    pub(crate) original: PathBuf,
 
     relative: bool,
 }
 
+impl PartState {
+    #[must_use]
+    pub(crate) fn details(&self) -> String {
+        match self {
+            PartState::Valid => "Valid path directory that is not empty",
+            PartState::NotDir => "Exists, but is a file. Must be a directory",
+            PartState::Missing => "Does not exist",
+            PartState::EmptyDir => "Exists and is a directory, but is empty",
+        }
+        .to_string()
+    }
+}
+
+impl Display for PathPart {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let state = &self.state;
+        let path = self.original.display();
+        let cwd = self.cwd.display();
+        if let Some(width) = f.width() {
+            write!(f, "[{:width$}] {path}", &format!("{}", self.state))?;
+        } else {
+            write!(f, "[{state}] {path}")?;
+        }
+
+        if self.relative {
+            write!(f, "(relative from {cwd})")?;
+        }
+
+        Ok(())
+    }
+}
+
 impl PathPart {
     #[must_use]
-    pub fn new(cwd: &Path, original: &Path) -> Self {
+    pub(crate) fn new(cwd: &Path, original: &Path) -> Self {
         let cwd = cwd.to_path_buf();
         let original = original.to_path_buf();
         let relative = original.is_relative();
@@ -41,7 +73,7 @@ impl PathPart {
             original.clone()
         };
 
-        let state = path_state(&absolute);
+        let state = part_state(&absolute);
 
         Self {
             absolute,
@@ -51,39 +83,30 @@ impl PathPart {
             relative,
         }
     }
-
-    #[must_use]
-    pub fn is_relative(&self) -> bool {
-        self.relative
-    }
-
-    // fn is_empty_dir(&self) -> bool {
-    //     files_iter(&self.absolute).and_then(|iter| iter.any(|file| file.exist()))
-    // }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum PathState {
-    /// Dir exists, but there's no executable files in it
-    EmptyDir,
-
-    /// Dir does not exist
-    Missing,
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub enum PartState {
+    /// No problems detected
+    Valid,
 
     /// Path exists, but it's not a directory
     NotDir,
 
-    /// No problems detected
-    Valid,
+    /// Dir does not exist
+    Missing,
+
+    /// Dir exists, but there's no executable files in it
+    EmptyDir,
 }
 
-impl Display for PathState {
+impl Display for PartState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PathState::EmptyDir => f.write_str("EMPTY  "),
-            PathState::Missing => f.write_str("MISSING"),
-            PathState::NotDir => f.write_str("NOT DIR"),
-            PathState::Valid => f.write_str("OK    "),
+            PartState::EmptyDir => f.write_str("EMPTY"),
+            PartState::Missing => f.write_str("MISSING"),
+            PartState::NotDir => f.write_str("NOT DIR"),
+            PartState::Valid => f.write_str("OK"),
         }
     }
 }
@@ -96,18 +119,18 @@ fn any_files_in_dir(path: &Path) -> bool {
     }
 }
 
-fn path_state(path: &Path) -> PathState {
+fn part_state(path: &Path) -> PartState {
     if path.exists() {
         if path.is_dir() {
             if any_files_in_dir(path) {
-                PathState::Valid
+                PartState::Valid
             } else {
-                PathState::EmptyDir
+                PartState::EmptyDir
             }
         } else {
-            PathState::NotDir
+            PartState::NotDir
         }
     } else {
-        PathState::Missing
+        PartState::Missing
     }
 }

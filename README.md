@@ -6,7 +6,6 @@ This crate helps you find an executable when there's a problem i.e. `which <name
 
 - std::os::unix only (for now)
 
-
 ## Use
 
 Use it to add diagnostic info to running a command:
