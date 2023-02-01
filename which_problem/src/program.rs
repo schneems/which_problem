@@ -87,7 +87,7 @@ impl Display for Program {
             }
             writeln!(
                 f,
-                "Help: Ensure the one you want comes first and is [{valid:file_state_width$}]'",
+                "Help: Ensure the one you want comes first and is [{valid:file_state_width$}]",
                 valid = FileState::Valid
             )?;
             f.write_str("Explanation:\n")?;
