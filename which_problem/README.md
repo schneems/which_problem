@@ -10,7 +10,7 @@ Use the CLI to dianose problems:
 $ cargo install cargo-whichp
 ```
 
-```
+```console
 $ cargo whichp bundle
 
 Program "bundle" found at "/Users/rschneeman/.gem/ruby/3.1.3/bin/bundle"

@@ -4,13 +4,13 @@ A CLI for dianosing executable lookup issues.
 
 ## Installation
 
-```
+```console
 $ cargo install cargo-whichp
 ```
 
 ## Use
 
-```
+```console
 $ cargo whichp bundle
 Program "bundle" found at "/Users/rschneeman/.gem/ruby/3.1.3/bin/bundle"
 
@@ -20,7 +20,7 @@ Warning: Executables with the same name found on the PATH:
   - [OK] "/usr/local/bin/bundle"
   - [OK] "/usr/local/bin/bundle"
   - [OK] "/usr/bin/bundle"
-Help: Ensure the one you want comes first and is [OK]'
+Help: Ensure the one you want comes first and is [OK]
 Explanation of keys:
     [OK] - File found matching program name with executable permissions. Valid executable.
 
@@ -48,12 +48,12 @@ Explanation of keys:
 
 For more options
 
-```
+```console
 $ cargo whichp --help
 ```
 
 ## Dev execute
 
-```
+```console
 $ cargo run -p cargo-whichp -- whichp --help
 ```
