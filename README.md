@@ -6,11 +6,11 @@ Tools to help you find problems when looking up executable files.
 
 Use the CLI to dianose problems:
 
-```ignore
+```console
 $ cargo install cargo-whichp
 ```
 
-```ignore
+```console
 $ cargo whichp bundle
 
 Program "bundle" found at "/Users/rschneeman/.gem/ruby/3.1.3/bin/bundle"
@@ -49,7 +49,7 @@ Explanation:
 
 ## Rust library
 
-```ignore
+```console
 $ cargo add which_problem
 ```
 
