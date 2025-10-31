@@ -1,11 +1,8 @@
 [workspace]
-members = [
-    "which_problem",
-    "cargo-whichp"
-]
+members = ["which_problem", "cargo-whichp"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 rust-version = "1.64"
 edition = "2021"
 license = "MIT"
@@ -13,5 +10,5 @@ homepage = "https://github.com/schneems/which_problem"
 repository = "https://github.com/schneems/which_problem"
 
 [workspace.dependencies]
-which_problem  = {version = "0.1.0", path = "which_problem" }
-cargo-whichp = {version = "0.1.0", path = "cargo-whichp" }
+which_problem = { version = "0.1.1", path = "which_problem" }
+cargo-whichp = { version = "0.1.1", path = "cargo-whichp" }

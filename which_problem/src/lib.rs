@@ -197,7 +197,10 @@ mod tests {
         assert_eq!(program.found_files.len(), 1);
         assert_eq!(program.found_files[0].path, symlink_path);
         assert_eq!(program.found_files[0].state, FileState::NotExecutable);
-        assert!(program.to_string().contains(&format!("Program \"yarn\" found at \"{}\" but is not executable", symlink_path.display())));
+        assert!(program.to_string().contains(&format!(
+            "Program \"yarn\" found at \"{}\" but is not executable",
+            symlink_path.display()
+        )));
     }
 
     #[test]
