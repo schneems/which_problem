@@ -18,12 +18,12 @@ impl PathWithState {
 
 impl Display for PathWithState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let state = &self.state;
-        let path = &self.path;
+        let state = &self.state.to_string();
+        let path = &self.path.display();
         if let Some(width) = f.width() {
-            write!(f, "[{:width$}] {path:?}", &format!("{}", self.state))?;
+            write!(f, "[{state:width$}] \"{path}\"",)?;
         } else {
-            write!(f, "[{state}] {path:?}")?;
+            write!(f, "[{state}] \"{path}\"")?;
         }
 
         Ok(())
