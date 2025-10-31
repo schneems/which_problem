@@ -74,7 +74,7 @@ mod tests {
 
         let program = Which {
             program,
-            path_env: Some(vec![dir.as_os_str(), dir_two.as_os_str()].join(&OsString::from(":"))),
+            path_env: Some([dir.as_os_str(), dir_two.as_os_str()].join(&OsString::from(":"))),
             ..Which::default()
         }
         .diagnose()
@@ -211,7 +211,7 @@ mod tests {
         std::fs::write(&expected, "lol").unwrap();
         let program = Which {
             program: name,
-            path_env: Some(vec![expected.as_os_str(), dir.as_os_str()].join(&OsString::from(":"))),
+            path_env: Some([expected.as_os_str(), dir.as_os_str()].join(&OsString::from(":"))),
             ..Which::default()
         }
         .diagnose()
@@ -237,7 +237,7 @@ mod tests {
 
         let program = Which {
             program: name,
-            path_env: Some(vec![expected.as_os_str(), dir.as_os_str()].join(&OsString::from(":"))),
+            path_env: Some([expected.as_os_str(), dir.as_os_str()].join(&OsString::from(":"))),
             ..Which::default()
         }
         .diagnose()
