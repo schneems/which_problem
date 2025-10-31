@@ -56,6 +56,15 @@ impl Display for Program {
         if let Some(found) = executable {
             let file = &found.path;
             writeln!(f, r#"Program {name:?} found at {file:?}"#)?;
+        } else if let Some(found) = found_files
+            .iter()
+            .find(|p| matches!(p.state, FileState::NotExecutable))
+        {
+            writeln!(
+                f,
+                r#"Program {name:?} found at {file:?} but is not executable"#,
+                file = found.path
+            )?;
         } else {
             writeln!(f, r#"Program {name:?} not found"#)?;
 

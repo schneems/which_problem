@@ -7,6 +7,7 @@ pub(crate) fn file_state(path: &Path) -> FileState {
     if path.is_symlink() {
         match symlink_state(path) {
             SymlinkState::Valid => FileState::Valid,
+            SymlinkState::NotExecutable => FileState::NotExecutable,
             _ => FileState::BadSymlink,
         }
     } else if path.exists() {

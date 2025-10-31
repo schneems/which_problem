@@ -172,6 +172,35 @@ mod tests {
     }
 
     #[test]
+    fn check_symlink_matching_program_name_is_reported_if_pointing_to_non_executable_file() {
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let dir = tmp_dir.path();
+        // Create a symlink named "yarn" that points to "yarn-3.10.0.cjs"
+        let symlink_path = dir.join("yarn");
+        let target_executable = dir.join("yarn-3.10.0.cjs");
+        let program_name = OsString::from("yarn");
+
+        // Create the target executable file
+        std::fs::write(&target_executable, "#!/usr/bin/env node\n").unwrap();
+
+        // Create symlink pointing to the differently named executable
+        std::os::unix::fs::symlink(&target_executable, &symlink_path).unwrap();
+
+        let program = Which {
+            program: program_name.clone(),
+            path_env: Some(dir.as_os_str().into()),
+            ..Which::default()
+        }
+        .diagnose()
+        .unwrap();
+
+        assert_eq!(program.found_files.len(), 1);
+        assert_eq!(program.found_files[0].path, symlink_path);
+        assert_eq!(program.found_files[0].state, FileState::NotExecutable);
+        assert!(program.to_string().contains(&format!("Program \"yarn\" found at \"{}\" but is not executable", symlink_path.display())));
+    }
+
+    #[test]
     fn check_parts_are_dirs() {
         let tmp_dir = tempfile::tempdir().unwrap();
         let dir = tmp_dir.path();
