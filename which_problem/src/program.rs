@@ -55,9 +55,9 @@ impl Display for Program {
         // Found/Not-found
         if let Some(found) = executable {
             let file = &found.path;
-            writeln!(f, r#"Program {name:?} found at {file:?}"#)?;
+            writeln!(f, r"Program {name:?} found at {file:?}")?;
         } else {
-            writeln!(f, r#"Program {name:?} not found"#)?;
+            writeln!(f, r"Program {name:?} not found")?;
 
             if self.name.is_empty() {
                 writeln!(f, "Warning: Program is blank")?;

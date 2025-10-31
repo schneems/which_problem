@@ -41,7 +41,7 @@ pub struct Which {
     pub program: OsString,
 
     /// The contents of PATH environment variable
-    /// i.e. OsString::new("different:path:here")
+    /// i.e. `OsString::new("different:path:here`")
     pub path_env: Option<OsString>,
 
     /// How many guesses to suggest if the command could not be found
