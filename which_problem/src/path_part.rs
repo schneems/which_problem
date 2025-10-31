@@ -45,8 +45,8 @@ impl PartState {
 impl Display for PathPart {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let state = &self.state;
-        let path = &self.original;
-        let cwd = &self.cwd;
+        let path = &self.original.display();
+        let cwd = &self.cwd.display();
         if let Some(width) = f.width() {
             write!(f, "[{:width$}] ", &format!("{}", self.state))?;
         } else {
@@ -54,9 +54,9 @@ impl Display for PathPart {
         }
 
         if self.relative {
-            write!(f, "(relative from {cwd:?}) ")?;
+            write!(f, "(relative from \"{cwd}\") ")?;
         }
-        write!(f, "{path:?}")?;
+        write!(f, "\"{path}\"")?;
 
         Ok(())
     }
