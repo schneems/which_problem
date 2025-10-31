@@ -52,12 +52,14 @@ impl Display for Program {
             .max()
             .unwrap_or(0);
 
+        let name = name.display();
+
         // Found/Not-found
         if let Some(found) = executable {
-            let file = &found.path;
-            writeln!(f, r#"Program {name:?} found at {file:?}"#)?;
+            let file = &found.path.display();
+            writeln!(f, r"Program {name:?} found at {file:?}")?;
         } else {
-            writeln!(f, r#"Program {name:?} not found"#)?;
+            writeln!(f, r"Program {name:?} not found")?;
 
             if self.name.is_empty() {
                 writeln!(f, "Warning: Program is blank")?;
@@ -114,7 +116,7 @@ impl Display for Program {
         if let Some(suggested) = suggested {
             let out = suggested
                 .iter()
-                .map(|s| format!("{s:?}"))
+                .map(|s| format!(r#""{}""#, s.display()))
                 .collect::<Vec<String>>()
                 .join(", ");
 
