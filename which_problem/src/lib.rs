@@ -44,7 +44,7 @@ mod tests {
     use crate::file_state::{file_state, FileState};
     use crate::path_with_state::PathWithState;
     use crate::which::Which;
-    use is_executable::IsExecutable;
+    use faccess::PathExt;
     use path_part::PartState;
     use std::ffi::OsString;
     use std::os::unix::fs::PermissionsExt;
@@ -124,7 +124,7 @@ mod tests {
         let mode = perms.mode() | 0o111;
         std::fs::set_permissions(&file, std::fs::Permissions::from_mode(mode)).unwrap();
 
-        assert!(file.is_executable());
+        assert!(file.executable());
 
         let program = Which {
             program: name,

@@ -10,5 +10,7 @@ homepage = "https://github.com/schneems/which_problem"
 repository = "https://github.com/schneems/which_problem"
 
 [workspace.dependencies]
+# We use `faccess` to check **effective** permisisons on disk (includes inherited values)
+faccess = "0.2.4"
 which_problem = { version = "0.1.1", path = "which_problem" }
 cargo-whichp = { version = "0.1.1", path = "cargo-whichp" }

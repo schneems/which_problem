@@ -1,4 +1,4 @@
-use is_executable::IsExecutable;
+use faccess::PathExt;
 use std::fmt::Display;
 use std::path::Path;
 
@@ -13,7 +13,7 @@ pub(crate) fn file_state(path: &Path) -> FileState {
     } else if path.exists() {
         if path.is_dir() {
             FileState::IsDir
-        } else if path.is_executable() {
+        } else if path.executable() {
             FileState::Valid
         } else {
             FileState::NotExecutable
