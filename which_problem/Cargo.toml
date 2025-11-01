@@ -13,7 +13,7 @@ keywords = ["executable", "which", "lookup"]
 [dependencies]
 is_executable = "1.0.1"
 itertools = "0.14.0"
-ordered-float = "3.4.0"
+ordered-float = "5.1.0"
 rayon = "1.6.1"
 strsim = "0.10.0"
 
