@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.2
+
 - Use `fsaccess` for executable check. [#12](https://github.com/schneems/which_problem/pull/12)
 
 The `fsaccess` crate uses https://pubs.opengroup.org/onlinepubs/9699919799/functions/access.html on unix systems which effectively delegates the question of if it's executable or not to the OS. This handles edge cases like where a file might have executable permissions, but a parent directory does not. From https://github.com/schneems/path_facts/blob/3400c1020a074713bc72a7193d23cf1a5d8f4317/README.md:

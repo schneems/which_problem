@@ -2,7 +2,7 @@
 members = ["which_problem", "cargo-whichp"]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 rust-version = "1.64"
 edition = "2021"
 license = "MIT"
