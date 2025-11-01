@@ -1,6 +1,6 @@
 [package]
 name = "which_problem"
-version = "0.1.1"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
@@ -11,7 +11,7 @@ documentation = "https://docs.rs/which_problem"
 keywords = ["executable", "which", "lookup"]
 
 [dependencies]
-is_executable = "1.0.1"
+faccess.workspace = true
 itertools = "0.14.0"
 ordered-float = "5.1.0"
 rayon = "1.6.1"
