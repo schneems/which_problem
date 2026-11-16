@@ -21,7 +21,7 @@ impl Display for PathWithState {
         let state = &self.state.to_string();
         let path = &self.path.display();
         if let Some(width) = f.width() {
-            write!(f, "[{state:width$}] \"{path}\"",)?;
+            write!(f, "[{state:width$}] \"{path}\"")?;
         } else {
             write!(f, "[{state}] \"{path}\"")?;
         }
