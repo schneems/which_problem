@@ -107,7 +107,7 @@ impl Display for Program {
                 writeln!(
                     f,
                     "    [{:file_state_width$}] - {details}",
-                    &format!("{state}")
+                    format!("{state}")
                 )?;
             }
             f.write_char('\n')?;
@@ -158,7 +158,7 @@ impl Display for Program {
             f.write_str("Explanation:\n")?;
             for state in path_parts.iter().map(|p| p.state.clone()).unique() {
                 let details = state.details();
-                writeln!(f, "    [{:part_width$}] - {details}", &format!("{state}"))?;
+                writeln!(f, "    [{:part_width$}] - {details}", format!("{state}"))?;
             }
         }
 

@@ -48,7 +48,7 @@ impl Display for PathPart {
         let path = &self.original.display();
         let cwd = &self.cwd.display();
         if let Some(width) = f.width() {
-            write!(f, "[{:width$}] ", &format!("{}", self.state))?;
+            write!(f, "[{:width$}] ", format!("{}", self.state))?;
         } else {
             write!(f, "[{state}] ")?;
         }
